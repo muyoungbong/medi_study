@@ -140,7 +140,20 @@ export default async function handler(req, res) {
       return res.status(429).json({ error: "Gemini 사용 한도에 도달했습니다. 잠시 후 다시 시도해 주세요." });
     }
     if (!response.ok) {
-      console.error("Gemini request failed", response.status);
+      const failure = await response.json().catch(() => ({}));
+      const message = String(failure.error?.message ?? "");
+      const reason = /(?:model.+(?:not found|not supported)|not found.+model|generateContent.+not supported)/i.test(message)
+        ? "model"
+        : /file.?search|corpus|store/i.test(message) ? "document store" : "unclassified";
+      console.error("Gemini request failed", response.status, reason, {
+        model, buildModel: Boolean(documentStore.model), buildStore: Boolean(documentStore.store)
+      });
+      if (response.status === 404 && reason === "model") {
+        return res.status(502).json({ error: "Gemini가 " + model + " 모델의 답변 생성을 지원하지 않습니다." });
+      }
+      if (response.status === 404 && reason === "document store") {
+        return res.status(502).json({ error: "Gemini가 PDF 검색 저장소에 접근하지 못했습니다." });
+      }
       return res.status(502).json({ error: geminiError(response.status) });
     }
 
