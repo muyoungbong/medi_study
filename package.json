@@ -1,0 +1,11 @@
+{
+  "name": "medi-study",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "22.x" },
+  "scripts": {
+    "index:document": "node --env-file-if-exists=.env.local scripts/index-document.js"
+  },
+  "devDependencies": { "@google/genai": "^1.30.0" }
+}
