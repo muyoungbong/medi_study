@@ -9,6 +9,28 @@ const storePattern = /^fileSearchStores\/[a-z0-9-]+$/;
 const displayName = "medi-study-dodeokgyung-1yXLG3D3L2dCd7Nd6vvp7lkb1GQZOfW4q";
 const downloadUrl = "https://drive.usercontent.google.com/download?id=1yXLG3D3L2dCd7Nd6vvp7lkb1GQZOfW4q&export=download&confirm=t";
 
+async function resourceExists(resource) {
+  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/" + resource, {
+    headers: { "x-goog-api-key": key },
+    signal: AbortSignal.timeout(15_000)
+  });
+  if (response.status === 404) return false;
+  if (!response.ok) throw new Error("Gemini 설정 확인 실패 (HTTP " + response.status + ")");
+  return true;
+}
+
+async function prepareModel(requested) {
+  const candidates = [...new Set([requested, "gemini-3.8-flash", "gemini-2.5-flash"])];
+  for (const candidate of candidates) {
+    if (!/^[a-z0-9.-]+$/.test(candidate)) continue;
+    if (await resourceExists("models/" + candidate)) {
+      if (candidate !== requested) console.warn("설정된 모델을 찾을 수 없어 " + candidate + " 사용");
+      return candidate;
+    }
+  }
+  throw new Error("API 키로 사용할 수 있는 Gemini Flash 모델을 찾지 못했습니다.");
+}
+
 async function findOrIndex(apiKey) {
   const ai = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: "v1beta" } });
   const stores = await ai.fileSearchStores.list();
@@ -48,13 +70,16 @@ try {
   if (process.env.VERCEL_ENV === "production" && (!key || !model)) {
     throw new Error("Vercel Production에 GEMINI_API_KEY와 GEMINI_MODEL을 설정해 주세요.");
   }
-  if (override && !storePattern.test(override)) {
-    throw new Error("GEMINI_FILE_SEARCH_STORE는 fileSearchStores/… 형식이어야 합니다.");
+  let store = "";
+  let selectedModel = "";
+  if (key && model) {
+    selectedModel = await prepareModel(model);
+    if (override && storePattern.test(override) && await resourceExists(override)) store = override;
+    if (!store) store = await findOrIndex(key);
   }
-  const store = override || (key && model ? await findOrIndex(key) : "");
   const directory = new URL("../lib/", import.meta.url);
   await mkdir(directory, { recursive: true });
-  await writeFile(new URL("document-store.json", directory), JSON.stringify({ store }) + "\n");
+  await writeFile(new URL("document-store.json", directory), JSON.stringify({ store, model: selectedModel }) + "\n");
   if (store) console.log("도덕경 문서 검색 준비 완료");
 } catch (error) {
   const message = String(error?.message ?? error);

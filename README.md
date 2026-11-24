@@ -17,7 +17,7 @@ Google Drive의 [노자 도덕경 전문 해설 PDF](https://drive.google.com/fi
 
 ## Vercel 배포
 
-기본 설정에서는 Vercel 빌드가 Drive에서 PDF를 내려받아 한 번 등록하고 이후 배포에서도 검색 저장소를 재사용합니다. Gemini 키와 모델을 Production 환경에 설정합니다. 이미 등록한 저장소를 사용하려면 수동 등록 절차에 따라 저장소 이름을 입력합니다.
+기본 설정에서는 Vercel 빌드가 Drive에서 PDF를 내려받아 한 번 등록하고 이후 배포에서도 검색 저장소를 재사용합니다. Gemini 키와 모델을 Production 환경에 설정합니다. 설정된 모델을 찾을 수 없으면 빌드가 현재 키로 접근 가능한 Gemini Flash 모델을 사용합니다. 이미 등록한 저장소를 사용하려면 수동 등록 절차에 따라 저장소 이름을 입력합니다.
 
 GitHub 저장소를 Vercel에 가져오고 프레임워크 프리셋을 **Other**로 설정합니다. 기존 저장소 하위 폴더에 앱을 추가할 경우 Vercel의 **Root Directory**를 해당 폴더로 지정합니다.
 

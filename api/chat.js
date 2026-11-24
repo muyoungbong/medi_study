@@ -89,8 +89,8 @@ export default async function handler(req, res) {
   }
 
   const key = process.env.GEMINI_API_KEY?.trim();
-  const model = process.env.GEMINI_MODEL?.trim().replace(/^models\//, "");
-  const store = process.env.GEMINI_FILE_SEARCH_STORE?.trim() || documentStore.store;
+  const model = documentStore.model || process.env.GEMINI_MODEL?.trim().replace(/^models\//, "");
+  const store = documentStore.store || process.env.GEMINI_FILE_SEARCH_STORE?.trim();
   if (!key || !model || !/^fileSearchStores\/[\w-]+$/.test(store ?? "")) {
     return res.status(503).json({ error: "참고 문서 또는 Gemini 설정이 아직 준비되지 않았습니다." });
   }
