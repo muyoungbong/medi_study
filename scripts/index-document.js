@@ -1,4 +1,4 @@
-import { stat } from "node:fs/promises";
+import { open, stat } from "node:fs/promises";
 import { basename } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { GoogleGenAI } from "@google/genai";
@@ -6,6 +6,15 @@ import { GoogleGenAI } from "@google/genai";
 async function indexDocument(file, apiKey) {
   const info = await stat(file);
   if (!info.isFile() || info.size === 0) throw new Error("내용이 있는 참고 문서 파일을 지정해 주세요.");
+
+  const handle = await open(file, "r");
+  try {
+    const signature = Buffer.alloc(5);
+    await handle.read(signature, 0, signature.length, 0);
+    if (signature.toString("ascii") !== "%PDF-") throw new Error("Drive에서 내려받은 PDF 파일을 지정해 주세요.");
+  } finally {
+    await handle.close();
+  }
 
   const ai = new GoogleGenAI({ apiKey });
   const store = await ai.fileSearchStores.create({ config: { displayName: "medi_study" } });
@@ -15,7 +24,7 @@ async function indexDocument(file, apiKey) {
   let operation = await ai.fileSearchStores.uploadToFileSearchStore({
     file,
     fileSearchStoreName: store.name,
-    config: { displayName: basename(file) }
+    config: { displayName: basename(file), mimeType: "application/pdf" }
   });
 
   const deadline = Date.now() + 10 * 60 * 1000;
