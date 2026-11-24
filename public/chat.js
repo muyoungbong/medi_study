@@ -20,25 +20,20 @@ function renderMessage(label, text, className) {
 
 function renderSources(message, sources) {
   if (!sources.length) return;
-  const heading = document.createElement("h3");
-  heading.textContent = "문서 출처";
-  const list = document.createElement("ol");
-  for (const source of sources) {
-    const item = document.createElement("li");
-    const link = document.createElement("a");
-    link.href = source.url;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = source.title + (source.page ? " · " + source.page + "쪽" : "");
-    item.append(link);
-    if (source.excerpt) {
-      const excerpt = document.createElement("blockquote");
-      excerpt.textContent = source.excerpt;
-      item.append(excerpt);
-    }
-    list.append(item);
-  }
-  message.append(heading, list);
+
+  const { title, url } = sources[0];
+  const pages = [...new Set(sources.map(source => source.page).filter(Number.isInteger))]
+    .sort((first, second) => first - second);
+  const line = document.createElement("p");
+  line.append("출처 · ");
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = title + (pages.length ? " " + pages.join(", ") + "쪽" : "");
+  line.append(link);
+  message.append(line);
 }
 
 form.addEventListener("submit", async event => {
