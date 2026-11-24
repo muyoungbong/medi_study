@@ -39,6 +39,35 @@ export function readGroundedAnswer(interaction) {
   };
 }
 
+function readGenerateContentAnswer(result) {
+  const candidate = result.candidates?.[0];
+  const text = (candidate?.content?.parts ?? []).filter(part => !part.thought)
+    .map(part => part.text ?? "").join("").trim();
+  const metadata = candidate?.groundingMetadata;
+  const indices = new Set((metadata?.groundingSupports ?? []).flatMap(support => support.groundingChunkIndices ?? []));
+  const contexts = [...indices].map(index => metadata?.groundingChunks?.[index]?.retrievedContext).filter(Boolean);
+  return readGroundedAnswer({ steps: [{
+    type: "model_output",
+    content: [{
+      type: "text",
+      text,
+      annotations: contexts.map(context => ({
+        type: "file_citation",
+        file_name: context.title || "dodeokgyung.pdf",
+        page_number: context.pageNumber,
+        source: context.text
+      }))
+    }]
+  }] });
+}
+
+function geminiError(status) {
+  if (status === 401 || status === 403) return "Gemini API 키의 권한 또는 프로젝트 설정을 확인해 주세요.";
+  if (status === 404) return "설정된 Gemini 모델이나 문서 검색 저장소를 찾을 수 없습니다.";
+  if (status === 400) return "Gemini가 문서 검색 요청을 거부했습니다. 모델 설정과 API 키를 확인해 주세요.";
+  return "Gemini 문서 검색을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
@@ -71,32 +100,51 @@ export default async function handler(req, res) {
     : [];
 
   try {
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+    const signal = AbortSignal.timeout(45_000);
+    const headers = { "Content-Type": "application/json", "x-goog-api-key": key };
+    const input = JSON.stringify({ previousQuestions, question });
+    let response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Api-Revision": "2026-05-20",
-        "x-goog-api-key": key
-      },
+      headers: { ...headers, "Api-Revision": "2026-05-20" },
       body: JSON.stringify({
         model,
         store: false,
         system_instruction: instruction,
-        input: JSON.stringify({ previousQuestions, question }),
+        input,
         tools: [{ type: "file_search", file_search_store_names: [store] }]
       }),
-      signal: AbortSignal.timeout(45_000)
+      signal
     });
+
+    let readAnswer = readGroundedAnswer;
+    if (response.status === 400 || response.status === 404) {
+      console.warn("Gemini Interactions rejected the request", response.status);
+      await response.body?.cancel();
+      response = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent",
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: instruction }] },
+            contents: [{ role: "user", parts: [{ text: input }] }],
+            tools: [{ fileSearch: { fileSearchStoreNames: [store] } }]
+          }),
+          signal
+        }
+      );
+      readAnswer = readGenerateContentAnswer;
+    }
 
     if (response.status === 429) {
       return res.status(429).json({ error: "Gemini 사용 한도에 도달했습니다. 잠시 후 다시 시도해 주세요." });
     }
     if (!response.ok) {
       console.error("Gemini request failed", response.status);
-      return res.status(502).json({ error: "Gemini 모델 설정과 문서 검색 저장소를 확인해 주세요." });
+      return res.status(502).json({ error: geminiError(response.status) });
     }
 
-    return res.status(200).json(readGroundedAnswer(await response.json()));
+    return res.status(200).json(readAnswer(await response.json()));
   } catch (error) {
     if (error?.name === "TimeoutError") {
       return res.status(504).json({ error: "문서 검색 시간이 초과됐습니다. 다시 시도해 주세요." });
