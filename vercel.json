@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "",
+  "buildCommand": "node scripts/prepare-vercel.js",
   "outputDirectory": "public",
   "functions": { "api/chat.js": { "maxDuration": 60 } }
 }

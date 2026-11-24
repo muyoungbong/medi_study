@@ -1,3 +1,5 @@
+import documentStore from "../lib/document-store.json" with { type: "json" };
+
 const sourceUrl = "https://drive.google.com/file/d/1yXLG3D3L2dCd7Nd6vvp7lkb1GQZOfW4q/view";
 const noEvidence = "참고 문서에서 질문에 답할 근거를 찾지 못했습니다.";
 const instruction = [
@@ -59,7 +61,7 @@ export default async function handler(req, res) {
 
   const key = process.env.GEMINI_API_KEY?.trim();
   const model = process.env.GEMINI_MODEL?.trim().replace(/^models\//, "");
-  const store = process.env.GEMINI_FILE_SEARCH_STORE?.trim();
+  const store = process.env.GEMINI_FILE_SEARCH_STORE?.trim() || documentStore.store;
   if (!key || !model || !/^fileSearchStores\/[\w-]+$/.test(store ?? "")) {
     return res.status(503).json({ error: "참고 문서 또는 Gemini 설정이 아직 준비되지 않았습니다." });
   }
